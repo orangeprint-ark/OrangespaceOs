@@ -56,6 +56,7 @@ export async function init(OS) {
     contentDiv.style.background = 'white';
     contentDiv.style.borderTop = '1px solid #ccc';
     contentDiv.style.height = '100%';
+    contentDiv.style.whiteSpace = 'normal';
 
     container.appendChild(addressBar);
     container.appendChild(contentDiv);
@@ -81,11 +82,63 @@ export async function init(OS) {
       forwardBtn.disabled = historyIndex >= historyStack.length - 1;
     }
 
-    // Load a page URL via your Vercel proxy API
+    function resolveURL(base, relative) {
+      try {
+        return new URL(relative, base).href;
+      } catch {
+        return relative;
+      }
+    }
+
+    // Rewrite relative URLs inside the injected HTML so navigation works
+    function rewriteRelativeURLs(html, baseUrl) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Fix <a> href
+      doc.querySelectorAll('a[href]').forEach(a => {
+        a.href = resolveURL(baseUrl, a.getAttribute('href'));
+        a.target = '_self';
+        a.addEventListener('click', e => {
+          e.preventDefault();
+          loadPage(a.href, true);
+        });
+      });
+
+      // Fix <img> src
+      doc.querySelectorAll('img[src]').forEach(img => {
+        img.src = resolveURL(baseUrl, img.getAttribute('src'));
+      });
+
+      // Fix <link> href (stylesheets)
+      doc.querySelectorAll('link[href]').forEach(link => {
+        if (link.getAttribute('rel') === 'stylesheet') {
+          link.href = resolveURL(baseUrl, link.getAttribute('href'));
+        }
+      });
+
+      // Fix <script> src (won't run scripts, but fix src anyway)
+      doc.querySelectorAll('script[src]').forEach(script => {
+        script.src = resolveURL(baseUrl, script.getAttribute('src'));
+      });
+
+      // Remove all inline scripts to prevent conflicts
+      doc.querySelectorAll('script').forEach(script => script.remove());
+
+      // Basic CSS reset
+      const styleReset = doc.createElement('style');
+      styleReset.textContent = `
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; background: white; color: black; }
+      `;
+      doc.head.prepend(styleReset);
+
+      return doc.documentElement.outerHTML;
+    }
+
     async function loadPage(url, addToHistory = true) {
       if (!url) return;
 
-      // Ensure url has protocol
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
       }
@@ -94,25 +147,23 @@ export async function init(OS) {
       contentDiv.innerHTML = `<p style="color: #555;">Loading ${url} ...</p>`;
 
       try {
-        // Proxy URL
+        // Proxy URL calls your serverless function
         const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
-
         const response = await fetch(proxyUrl);
+
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         let html = await response.text();
 
-        // Inject raw HTML into contentDiv
-        contentDiv.innerHTML = html;
+        // Get base URL from <base> tag or fallback to page URL
+        const baseMatch = html.match(/<base\s+href="([^"]*)"/i);
+        const baseUrl = baseMatch ? baseMatch[1] : url;
 
-        // Intercept clicks on links inside contentDiv to load via proxy & history stack
-        contentDiv.querySelectorAll('a[href]').forEach(a => {
-          a.target = '_self'; // prevent new tabs/windows
-          a.onclick = e => {
-            e.preventDefault();
-            loadPage(a.href);
-          };
-        });
+        // Rewrite relative URLs for navigation and assets
+        html = rewriteRelativeURLs(html, baseUrl);
+
+        // Inject rewritten HTML into content div
+        contentDiv.innerHTML = html;
 
         if (addToHistory) {
           historyStack.splice(historyIndex + 1);
@@ -151,7 +202,7 @@ export async function init(OS) {
       }
     });
 
-    // Start blank
+    // Initial prompt
     contentDiv.innerHTML = `<p style="color: #555;">Enter a URL and press Go</p>`;
   });
 }

@@ -1,5 +1,7 @@
 [
   "vfs.js",
   "terminal.js",
-  "browser.js"
+  "browser.js",
+  "explorer.js",
+  "userStorage.js"
 ]
