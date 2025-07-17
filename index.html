@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OrangeSpace OS Alpha</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div
+      id="desktop"
+      tabindex="0"
+      aria-label="OrangeSpace OS Desktop"
+      role="main"
+    >
+      <div
+        class="icon"
+        data-app="terminal"
+        tabindex="0"
+        aria-label="Open Terminal"
+      >
+        <img src="icons/terminal.png" alt="Terminal Icon" />
+        <span>Terminal</span>
+      </div>
+      <div
+        class="icon"
+        data-app="wasmapp"
+        tabindex="0"
+        aria-label="Open WASM App"
+      >
+        <img src="icons/wasm.svg" alt="WASM App Icon" />
+        <span>WASM App</span>
+      </div>
+      <div
+        class="icon"
+        data-app="rubyapp"
+        tabindex="0"
+        aria-label="Open Ruby Module"
+      >
+        <img src="icons/ruby.svg" alt="Ruby Icon" />
+        <span>Ruby Module</span>
+      </div>
+      <div
+        class="icon"
+        data-app="csharpapp"
+        tabindex="0"
+        aria-label="Open C# Module"
+      >
+        <img src="icons/csharp.svg" alt="C# Icon" />
+        <span>C# Module</span>
+      </div>
+      <div
+        class="icon"
+        data-app="explorer"
+        tabindex="0"
+        aria-label="Open File Explorer"
+      >
+        <img src="icons/explorer.png" alt="Explorer Icon" />
+        <span>Explorer.exe</span>
+      </div>
+      <div
+        class="icon"
+        data-app="browser"
+        tabindex="0"
+        aria-label="Open OrangeSpace Browser"
+      >
+        <img src="icons/browser.png" alt="Browser Icon" />
+        <span>Browser</span>
+      </div>
+    </div>
+
+    <div id="taskbar" role="contentinfo" aria-label="Taskbar">
+      OrangeSpace OS Alpha
+    </div>
+
+    <script type="module" src="os.js"></script>
+  </body>
+</html>
