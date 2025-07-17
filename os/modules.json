@@ -1,7 +1,9 @@
 [
-  "vfs.js",
   "terminal.js",
   "browser.js",
   "explorer.js",
-  "userStorage.js"
+  "userStorage.js",
+  "cpu.js",
+  "exeopener.js",
+  "rightclick.js"
 ]

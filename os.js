@@ -1,4 +1,5 @@
 // os.js - Modular OS Core Loader
+import { VFS } from './kernel/vfs.js';
 
 const desktop = document.getElementById('desktop');
 const taskbar = document.getElementById('taskbar');
@@ -6,6 +7,7 @@ const taskbar = document.getElementById('taskbar');
 const windows = [];
 const drivers = {};
 const apps = new Map();
+const vfs = new VFS(); // ✅ Correct instantiation
 
 let zIndexCounter = 10;
 
@@ -20,6 +22,7 @@ const OS = {
   registerApp,
   getApp,
   bringToFront,
+  vfs // ✅ Inject into OS context
 };
 
 // Register a new app with a unique name and launch function
