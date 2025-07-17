@@ -60,14 +60,11 @@ export async function init(OS) {
     container.appendChild(addressBar);
     container.appendChild(contentDiv);
 
-    const win = OS.createWindow('OrangeSpace Browser (Proxy Powered)', container, { left: '100px', top: '100px' });
+    const win = OS.createWindow('OrangeSpace Browser (Proxy)', container, { left: '100px', top: '100px' });
 
     // History stack
     const historyStack = [];
     let historyIndex = -1;
-
-    // Use dynamic proxy base URL relative to the current site origin
-    const proxyBase = window.location.origin + '/api/proxy?url=';
 
     function styleNavButton(btn) {
       btn.style.border = '1px solid #ccc';
@@ -84,72 +81,11 @@ export async function init(OS) {
       forwardBtn.disabled = historyIndex >= historyStack.length - 1;
     }
 
-    function resolveURL(base, relative) {
-      try {
-        return new URL(relative, base).href;
-      } catch {
-        return relative;
-      }
-    }
-
-    // Rewrite relative URLs and force proxy usage
-    function rewriteRelativeURLs(html, baseUrl) {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-
-      // Fix <a> hrefs to use proxy and bind click navigation
-      doc.querySelectorAll('a[href]').forEach(a => {
-        const realHref = resolveURL(baseUrl, a.getAttribute('href'));
-        a.href = proxyBase + encodeURIComponent(realHref);
-        a.target = '_self';
-        a.addEventListener('click', e => {
-          e.preventDefault();
-          loadPage(realHref, true);
-        });
-      });
-
-      // Fix <img> src
-      doc.querySelectorAll('img[src]').forEach(img => {
-        img.src = resolveURL(baseUrl, img.getAttribute('src'));
-      });
-
-      // Fix <link> href (stylesheets)
-      doc.querySelectorAll('link[href]').forEach(link => {
-        if (link.rel === 'stylesheet') {
-          link.href = resolveURL(baseUrl, link.getAttribute('href'));
-        }
-      });
-
-      // Fix <script> src (won't run, but fix src anyway)
-      doc.querySelectorAll('script[src]').forEach(script => {
-        script.src = resolveURL(baseUrl, script.getAttribute('src'));
-      });
-
-      // Remove all inline scripts for safety
-      doc.querySelectorAll('script').forEach(script => script.remove());
-
-      // Insert CSS reset style
-      const styleReset = doc.createElement('style');
-      styleReset.textContent = `
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        body {
-          font-family: sans-serif;
-          background: white;
-          color: black;
-        }
-      `;
-      doc.head.prepend(styleReset);
-
-      return doc.documentElement.outerHTML;
-    }
-
+    // Load a page URL via your Vercel proxy API
     async function loadPage(url, addToHistory = true) {
       if (!url) return;
 
+      // Ensure url has protocol
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
       }
@@ -158,17 +94,25 @@ export async function init(OS) {
       contentDiv.innerHTML = `<p style="color: #555;">Loading ${url} ...</p>`;
 
       try {
-        const proxiedUrl = proxyBase + encodeURIComponent(url);
-        const response = await fetch(proxiedUrl);
+        // Proxy URL
+        const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+
+        const response = await fetch(proxyUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         let html = await response.text();
 
-        const baseUrl = url;
-
-        html = rewriteRelativeURLs(html, baseUrl);
-
+        // Inject raw HTML into contentDiv
         contentDiv.innerHTML = html;
+
+        // Intercept clicks on links inside contentDiv to load via proxy & history stack
+        contentDiv.querySelectorAll('a[href]').forEach(a => {
+          a.target = '_self'; // prevent new tabs/windows
+          a.onclick = e => {
+            e.preventDefault();
+            loadPage(a.href);
+          };
+        });
 
         if (addToHistory) {
           historyStack.splice(historyIndex + 1);
@@ -207,7 +151,7 @@ export async function init(OS) {
       }
     });
 
-    // Start with blank content message
+    // Start blank
     contentDiv.innerHTML = `<p style="color: #555;">Enter a URL and press Go</p>`;
   });
 }
