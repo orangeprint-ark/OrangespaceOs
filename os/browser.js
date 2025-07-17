@@ -60,11 +60,14 @@ export async function init(OS) {
     container.appendChild(addressBar);
     container.appendChild(contentDiv);
 
-    const win = OS.createWindow('OrangeSpace Browser (Complex)', container, { left: '100px', top: '100px' });
+    const win = OS.createWindow('OrangeSpace Browser (Proxy Powered)', container, { left: '100px', top: '100px' });
 
     // History stack
     const historyStack = [];
     let historyIndex = -1;
+
+    // Use dynamic proxy base URL relative to the current site origin
+    const proxyBase = window.location.origin + '/api/proxy?url=';
 
     function styleNavButton(btn) {
       btn.style.border = '1px solid #ccc';
@@ -78,7 +81,7 @@ export async function init(OS) {
 
     function updateNavButtons() {
       backBtn.disabled = historyIndex <= 0;
-      forwardBtn.disabled = historyIndex >= historyStack.length -1;
+      forwardBtn.disabled = historyIndex >= historyStack.length - 1;
     }
 
     function resolveURL(base, relative) {
@@ -89,18 +92,19 @@ export async function init(OS) {
       }
     }
 
-    // Rewrite relative URLs inside the injected HTML
+    // Rewrite relative URLs and force proxy usage
     function rewriteRelativeURLs(html, baseUrl) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
 
-      // Fix <a> href
+      // Fix <a> hrefs to use proxy and bind click navigation
       doc.querySelectorAll('a[href]').forEach(a => {
-        a.href = resolveURL(baseUrl, a.getAttribute('href'));
-        a.target = '_self'; // Keep navigation inside this window
+        const realHref = resolveURL(baseUrl, a.getAttribute('href'));
+        a.href = proxyBase + encodeURIComponent(realHref);
+        a.target = '_self';
         a.addEventListener('click', e => {
           e.preventDefault();
-          loadPage(a.href, true);
+          loadPage(realHref, true);
         });
       });
 
@@ -111,26 +115,22 @@ export async function init(OS) {
 
       // Fix <link> href (stylesheets)
       doc.querySelectorAll('link[href]').forEach(link => {
-        const rel = link.getAttribute('rel');
-        if (rel === 'stylesheet') {
+        if (link.rel === 'stylesheet') {
           link.href = resolveURL(baseUrl, link.getAttribute('href'));
         }
       });
 
-      // Fix <script> src (scripts won’t run anyway, but fix src anyway)
+      // Fix <script> src (won't run, but fix src anyway)
       doc.querySelectorAll('script[src]').forEach(script => {
         script.src = resolveURL(baseUrl, script.getAttribute('src'));
       });
 
-      // Remove all inline scripts to avoid conflicts
-      doc.querySelectorAll('script').forEach(script => {
-        script.remove();
-      });
+      // Remove all inline scripts for safety
+      doc.querySelectorAll('script').forEach(script => script.remove());
 
-      // Insert a basic CSS reset style
+      // Insert CSS reset style
       const styleReset = doc.createElement('style');
       styleReset.textContent = `
-        /* CSS Reset */
         * {
           margin: 0;
           padding: 0;
@@ -158,29 +158,24 @@ export async function init(OS) {
       contentDiv.innerHTML = `<p style="color: #555;">Loading ${url} ...</p>`;
 
       try {
-        const response = await fetch(url);
+        const proxiedUrl = proxyBase + encodeURIComponent(url);
+        const response = await fetch(proxiedUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         let html = await response.text();
 
-        // Get base URL from <base> tag or fallback to page URL
-        const baseMatch = html.match(/<base\s+href="([^"]*)"/i);
-        const baseUrl = baseMatch ? baseMatch[1] : url;
+        const baseUrl = url;
 
-        // Rewrite relative URLs
         html = rewriteRelativeURLs(html, baseUrl);
 
-        // Inject rewritten HTML
         contentDiv.innerHTML = html;
 
-        // Manage history
         if (addToHistory) {
           historyStack.splice(historyIndex + 1);
           historyStack.push(url);
           historyIndex++;
           updateNavButtons();
         }
-
       } catch (err) {
         contentDiv.innerHTML = `<p style="color:red;">Failed to load page: ${err.message}</p>`;
       }
@@ -195,7 +190,7 @@ export async function init(OS) {
     };
 
     forwardBtn.onclick = () => {
-      if (historyIndex < historyStack.length -1) {
+      if (historyIndex < historyStack.length - 1) {
         historyIndex++;
         loadPage(historyStack[historyIndex], false);
         updateNavButtons();
@@ -212,7 +207,7 @@ export async function init(OS) {
       }
     });
 
-    // Start blank
+    // Start with blank content message
     contentDiv.innerHTML = `<p style="color: #555;">Enter a URL and press Go</p>`;
   });
 }
